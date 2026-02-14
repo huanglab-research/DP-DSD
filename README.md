@@ -4,7 +4,7 @@ This is the  implementation of  paper: Dual-Path Discriminative Semantic Distill
 > ⚠ **Note:** The source code is currently incomplete and will be fully released once the manuscript is accepted by the journal.
 
 ## Datasets
-Experiments on **3 image datasets**:
+Experiments on **three image datasets**:
 FGVC-Aircraft，Stanford Cars, CUB-200-2011
 
 |#|Datasets|Download|
