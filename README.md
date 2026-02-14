@@ -25,21 +25,21 @@ pip install -r requirement.txt
 ## Training/Resume Training
 
 ```python
-CUDA_VISIBLE_DEVICES=1,2 python -m torch.distributed.launch --nproc_per_node=2 --master_port 29501 main_RAFG.py --arch swin --data_path $DATA_PATH/train --output_dir $OUT_PATH --batch_size_per_gpu 64 --epochs 300 --teacher_temp 0.07 --warmup_epochs 10 --warmup_teacher_temp_epochs 30 --norm_last_layer false --use_dense_prediction True --cfg experiments/imagenet/swin/swin_tiny_patch4_window7_224.yaml
+CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --master_port=29601 main_DP-DSD.py --cfg experiments/imagenet/swin/swin_tiny_patch4_window7_224.yaml
 ```
 
 ## Test/Evaluation
 
 ```python
-CUDA_VISIBLE_DEVICES=1 python -m torch.distributed.launch --nproc_per_node=1 --master_port 29502 eval_linear.py --data_path $DATA_PATH --output_dir $OUT_PATH/lincls/epoch1 --pretrained_weights  /data1/output1/checkpoint.pth --checkpoint_key teacher --batch_size_per_gpu 128 --arch swin_tiny --cfg experiments/imagenet/swin/swin_tiny_patch4_window7_224.yaml --n_last_blocks 4 --num_labels 200
+CUDA_VISIBLE_DEVICES=0 torchrun --nproc_per_node=1 --master_port=29601 eval_linear.py --arch swin_tiny --cfg experiments/imagenet/swin/swin_tiny_patch4_window7_224.yaml MODEL.NUM_CLASSES 100
 ```
 
 ## License & Acknowledgment
 
 We are very grateful for these excellent works: [LCR](https://github.com/GANPerf/LCR),[EsViT](https://github.com/microsoft/esvit),[DINO]( https://github.com/facebookresearch/dino). Please follow their respective licenses for usage and redistribution. Thanks for their awesome works.
 
-## 📬 Contact
+## Contact
 
-Feel free to contact me if there is any question. (Yao Xu: [xuyao8809@stu.ouc.edu.cn](mailto:xuyao8809@stu.ouc.edu.cn), Lei Huang: [huangl@ouc.edu.cn](mailto:huangl@ouc.edu.cn))
+Feel free to contact me if there is any question. (Ting Yang: [yangting123@stu.ouc.edu.cn](mailto:yangting123@stu.ouc.edu.cn), Lei Huang: [huangl@ouc.edu.cn](mailto:huangl@ouc.edu.cn))
 
 ---
