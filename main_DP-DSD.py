@@ -595,7 +595,7 @@ def extract_topk_attention_patches(attn: torch.Tensor,
         topk_indices (Tensor): Indices of top-k patches [B, topk]
         importance (Tensor): Attention-based importance scores [B, N]
     """
-    # 如果是单个样本，添加 batch 维度
+    
     is_single = False
     if attn.dim() == 3:
         attn = attn.unsqueeze(0)
@@ -622,14 +622,12 @@ def extract_topk_attention_patches(attn: torch.Tensor,
     return topk_feats, topk_indices, topk_scores, importance
 
 
-# 单轮训练函数
-# 插入点
+
 def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loader,
                     optimizer, lr_schedule, wd_schedule, momentum_schedule, epoch, mixup_fn,
                     fp16_scaler, args):
     metric_logger = utils.MetricLogger(delimiter="  ")
 
-    # ============ creating queue ... ============
 
     header = 'Epoch: [{}/{}]'.format(epoch, args.epochs)
     for it, (images, _, image_id) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -675,42 +673,7 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
             # loss = dino_loss(student_output, teacher_output, epoch, targets_mixup)
 
             #################################################################
-            x1 = teacher_input[0]
-            x2 = teacher_input[1]
-
-            # 注意力提取,目标样本的两个视图都提取特征和权重
-            global_feat1, patch_feat1 = teacher.forward_feature_maps(x1)
-            x_patch1 = teacher.patch_embed(x1)
-            attn_map1 = teacher.forward_last_selfattention(x_patch1)
-            topk_feats1, topk_indices1, topk_importance1, importance1 = extract_topk_attention_patches(attn_map1,
-                                                                                                       patch_feat1)
-            global_feat2, patch_feat2 = teacher.forward_feature_maps(x2)
-            x_patch2 = teacher.patch_embed(x2)
-            attn_map2 = teacher.forward_last_selfattention(x_patch2)
-            topk_feats2, topk_indices2, topk_importance2, importance2 = extract_topk_attention_patches(attn_map2,
-                                                                                                       patch_feat2)
-
-            topk_feats = torch.stack([topk_feats1, topk_feats2], dim=0)
-            topk_indices = torch.stack([topk_indices1, topk_indices2], dim=0)
-            topk_attention = torch.stack([topk_importance1, topk_importance2], dim=0)
-            all_patch_feat = torch.stack([patch_feat1, patch_feat2], dim=0)
-
-            visualize_topk_patches(
-                batch_imgs=x1,
-                topk_indices_tensor=topk_indices1,
-                patch_feat=patch_feat1,
-                save_dir=f"./vis/epoch_{epoch}_view1",
-                num_visualize=4
-            )
-
-            visualize_topk_patches(
-                batch_imgs=x2,
-                topk_indices_tensor=topk_indices2,
-                patch_feat=patch_feat2,
-                save_dir=f"./vis/epoch_{epoch}_view2",
-                num_visualize=4
-            )
-
+            
             loss = dino_loss(student_output, teacher_output, epoch, targets_mixup, topk_feats, topk_attention,
                              topk_indices)
 
@@ -733,7 +696,7 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, data_loade
 
             sys.exit(1)
 
-        # student update学生模型更新
+      
         optimizer.zero_grad()
         param_norms = None
         if fp16_scaler is None:
@@ -934,9 +897,7 @@ class DINOLoss(nn.Module):
         # we apply a warm up for the teacher temperature because
         # a too high temperature makes the training instable at the beginning
 
-        # 判别性参数
-
-        # 温度调度器，缓解初始训练不稳定，逐步升高温度
+        
         self.teacher_temp_schedule = np.concatenate((
             np.linspace(warmup_teacher_temp,
                         teacher_temp, warmup_teacher_temp_epochs),
@@ -986,26 +947,7 @@ class DINOLoss(nn.Module):
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
 
-def get_entropy(t_region, B, N):
-    """
-    t_region: list of 2 views, each [B*N, D] (伪类分布)
 
-    返回：
-        neg_entropy_all: list of 2 views, 每个 [B, N]，所有 patch 的负熵值
-    """
-    neg_entropy_all = []
-
-    for t_r in t_region:
-        t_r = t_r.view(B, N, -1)  # [B, N, D]
-
-        # 计算每个 patch 的熵
-        entropy = -torch.sum(t_r * torch.log(t_r + 1e-6), dim=-1)  # [B, N]
-
-        # 取负数（熵越低 → 值越大）
-        neg_entropy = -entropy  # [B, N]
-        neg_entropy_all.append(neg_entropy)
-
-    return neg_entropy_all
 
 
 class DDINOLoss(nn.Module):
@@ -1021,8 +963,7 @@ class DDINOLoss(nn.Module):
         self.register_buffer("center_patch", torch.zeros(1, out_dim))  # topk patch中心
         self.register_buffer("s_center_patch", torch.zeros(1, out_dim))  # topk 相似样本 patch中心
 
-        # 全局中心：当前 batch 中，模型自己生成的伪标签分布的平均值，用来防止网络输出坍缩到某个伪类别”。
-        # 局部中心，图像中 每个 patch（局部区域） 的“伪类别分布”平均，用来对局部区域输出做对齐/归一
+        
         # we apply a warm up for the teacher temperature because
         # a too high temperature makes the training instable at the beginning
         self.teacher_temp_schedule = np.concatenate((
@@ -1074,74 +1015,14 @@ class DDINOLoss(nn.Module):
 
         ############################################
 
-        entropy = get_entropy(t_region, B, N)
-        entropy_t = torch.stack([e for e in entropy], dim=0)  # [V,B,N]
-        entropy_norm = F.softmax(entropy_t, dim=-1)  # [V,B,N]
-
-        topk_entropy_norm_0 = torch.gather(entropy_norm[0], 1, topk_indices[0])
-        topk_entropy_norm_1 = torch.gather(entropy_norm[1], 1, topk_indices[1])
-
-        attn_weight_0 = patch_attentions[0]  # shape: [B, K]
-        attn_weight_1 = patch_attentions[1]  # shape: [B, K]
-
-        if epoch < warmup_epoch:
-            beta = 0.0
-        else:
-            beta = min(max_beta, max_beta * (epoch - warmup_epoch) / (300 - warmup_epoch))
-
-        attn_weight_0 = attn_weight_0 * (1 + beta * topk_entropy_norm_0)
-        attn_weight_1 = attn_weight_1 * (1 + beta * topk_entropy_norm_1)
-
-        # attn_weight_0 = 1* (1 + beta * topk_entropy_norm_0)
-        # attn_weight_1 = 1* (1 + beta * topk_entropy_norm_1)
-
-        # 做归一化（可选，避免数值不稳定）
-        attn_weight_0 = attn_weight_0 / (attn_weight_0.sum(dim=1, keepdim=True) + 1e-6)
-        attn_weight_1 = attn_weight_1 / (attn_weight_1.sum(dim=1, keepdim=True) + 1e-6)
-
-        # 加权聚合：B x C = (B x K) @ (B x K x C)
-        # print(patch_features.shape)
-        # patch_pool_0 = torch.sum(patch_features[0] * topk_entropy_norm_0.unsqueeze(-1), dim=1)  # [B, C]
-        # patch_pool_1 = torch.sum(patch_features[1] * topk_entropy_norm_1.unsqueeze(-1), dim=1)
-        # # print(patch_pool_0.shape)
-
-        # 修改为每个 patch 权重相同（均值聚合）
-        # patch_pool_0 = patch_features[0].mean(dim=1)  # [B, C]
-        # patch_pool_1 = patch_features[1].mean(dim=1)  # [B, C]
-
-        patch_pool_0 = torch.sum(patch_features[0] * attn_weight_0.unsqueeze(-1), dim=1)  # [B, C]
-        patch_pool_1 = torch.sum(patch_features[1] * attn_weight_1.unsqueeze(-1), dim=1)
-
-        logits_0 = self.head(patch_pool_0)  # (B, D)
-        logits_1 = self.head(patch_pool_1)
-
-        pseudo_cls_0 = F.softmax((logits_0 - self.center_patch) / temp, dim=-1)
-        pseudo_cls_1 = F.softmax((logits_1 - self.center_patch) / temp, dim=-1)
-
-        patch_output = torch.cat([logits_0, logits_1], dim=0)
-
-        logprob_s_cls_0 = F.log_softmax(s_cls[0], dim=-1)
-        logprob_s_cls_1 = F.log_softmax(s_cls[1], dim=-1)
-
-        # —— 伪类对学生的监督 ——
-        loss_pseudo_00 = torch.sum(-pseudo_cls_0 * logprob_s_cls_0, dim=-1).mean()
-        loss_pseudo_11 = torch.sum(-pseudo_cls_1 * logprob_s_cls_1, dim=-1).mean()
-
-        # 跨视图伪类对学生的监督
-        loss_cross_01 = torch.sum(-pseudo_cls_0 * logprob_s_cls_1, dim=-1).mean()
-        loss_cross_10 = torch.sum(-pseudo_cls_1 * logprob_s_cls_0, dim=-1).mean()
-
-        # 总融合
-        loss_pseudo_view = 0.25 * (loss_pseudo_00 + loss_pseudo_11 + loss_cross_01 + loss_cross_10)
-        # loss_pseudo_view = 0.5 * (loss_pseudo_00 + loss_pseudo_11 )
-
+        
         total_loss = 0
         n_loss_terms = 0
 
         # === Patch 权重：[2, B, N] ===
-        for iq, q in enumerate(t_cls):  # teacher 的第 iq 个 view（通常是两个）
+        for iq, q in enumerate(t_cls):  
 
-            for v in range(len(s_cls)):  # 遍历 student 的所有 view（如 10 个）
+            for v in range(len(s_cls)): 
 
                 if v == iq:
                     continue  # skip same-view comparisons
@@ -1209,79 +1090,6 @@ class DDINOLoss(nn.Module):
         self.center_patch = self.center_patch * self.center_momentum + batch_center_patch * (1 - self.center_momentum)
 
 
-def visualize_topk_patches(batch_imgs,
-                           topk_indices_tensor,
-                           patch_feat,
-                           save_dir=None,
-                           num_visualize=2):
-    """
-    batch_imgs: [B,3,H,W]
-    topk_indices_tensor: [B,K]
-    patch_feat: [B, N, C] or [N, C]
-    """
-
-    B, C, H, W = batch_imgs.shape
-
-    if patch_feat.dim() == 2:
-        num_patches = patch_feat.shape[0]
-    else:
-        num_patches = patch_feat.shape[1]
-
-    grid_size = int(num_patches ** 0.5)
-
-    print(f"✅ Swin grid size: {grid_size} x {grid_size}")
-
-    patch_h, patch_w = H // grid_size, W // grid_size
-
-    inv_normalize = transforms.Normalize(
-        mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.225],
-        std=[1 / 0.229, 1 / 0.224, 1 / 0.225]
-    )
-
-    visualize_idxs = list(range(min(num_visualize, B)))
-
-    for i in visualize_idxs:
-
-        img_tensor = inv_normalize(batch_imgs[i].cpu()).clamp(0, 1)
-        img_pil = transforms.ToPILImage()(img_tensor)
-
-        draw = ImageDraw.Draw(img_pil, "RGBA")
-
-        # 1. 画 Swin 网格
-        for r in range(1, grid_size):
-            draw.line([(0, r * patch_h), (W, r * patch_h)], fill=(0, 0, 0, 255), width=1)
-        for c in range(1, grid_size):
-            draw.line([(c * patch_w, 0), (c * patch_w, H)], fill=(0, 0, 0, 255), width=1)
-
-        # 2. 画 Top-K patch
-        topk = topk_indices_tensor[i].cpu().numpy().astype(int)
-
-        for idx in topk:
-            row = idx // grid_size
-            col = idx % grid_size
-
-            x0 = col * patch_w
-            y0 = row * patch_h
-            x1 = x0 + patch_w
-            y1 = y0 + patch_h
-
-            draw.rectangle(
-                [x0, y0, x1, y1],
-                outline=(255, 0, 0, 255),
-                width=2,
-                fill=(255, 0, 0, 80)
-            )
-
-        plt.figure(figsize=(5, 5))
-        plt.imshow(img_pil)
-        plt.axis("off")
-
-        if save_dir:
-            os.makedirs(save_dir, exist_ok=True)
-            img_pil.save(os.path.join(save_dir, f"sample_{i}.png"))
-
-        plt.show()
-        plt.close()
 
 
 if __name__ == '__main__':
