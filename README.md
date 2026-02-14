@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=0 torchrun --nproc_per_node=1 --master_port=29601 eval_line
 
 ## License & Acknowledgment
 
-We are very grateful for these excellent works: [LCR](https://github.com/GANPerf/LCR),[EsViT](https://github.com/microsoft/esvit),[DINO]( https://github.com/facebookresearch/dino). Please follow their respective licenses for usage and redistribution. Thanks for their awesome works.
+We are very grateful for these excellent works: [EsViT](https://github.com/microsoft/esvit),[DINO]( https://github.com/facebookresearch/dino). Please follow their respective licenses for usage and redistribution. Thanks for their awesome works.
 
 ## Contact
 
