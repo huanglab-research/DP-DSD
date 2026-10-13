@@ -48,7 +48,7 @@ We are very grateful for these excellent works: [EsViT](https://github.com/micro
 ## Cite
 
 ```
-@ARTICLE{xu2026,
+@ARTICLE{11723210,
   author={Ting Yang, Lei Huang, Jie Nie and Zhiqiang Wei},
   journal={IEEE Transactions on Circuits and Systems for Video Technology}, 
   title={Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition}, 
