@@ -1,6 +1,7 @@
 # Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition
 
 This is the  implementation of  paper: Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition
+
 By Ting Yang, Lei Huang, Jie Nie and Zhiqiang Wei. 
 > **Abstract:** 
 Self-supervised learning has achieved remarkable performance in generic representation learning. However, most existing approaches often struggle in fine-grained visual recognition, as they tend to focus on globally dominant patterns while neglecting subtle but discriminative patterns that are essential for distinguishing visually similar categories. 
@@ -48,7 +49,7 @@ We are very grateful for these excellent works: [EsViT](https://github.com/micro
 
 ```
 @ARTICLE{xu2026,
-  author={Ting Yang, Lei Huang, Jie Nie, Yadong Huo and Zhiqiang Wei},
+  author={Ting Yang, Lei Huang, Jie Nie and Zhiqiang Wei},
   journal={IEEE Transactions on Circuits and Systems for Video Technology}, 
   title={Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition}, 
   year={2026}
