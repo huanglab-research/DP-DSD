@@ -885,6 +885,29 @@ class ProgressMeter(object):
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
+def get_entropy(t_region, B, N):
+    """
+    t_region: list of 2 views, each [B*N, D] (伪类分布)
+
+    返回：
+        neg_entropy_all: list of 2 views, 每个 [B, N]，所有 patch 的负熵值
+    """
+    neg_entropy_all = []
+
+    for t_r in t_region:
+        t_r = t_r.view(B, N, -1)  # [B, N, D]
+
+        # 计算每个 patch 的熵
+        entropy = -torch.sum(t_r * torch.log(t_r + 1e-6), dim=-1)  # [B, N]
+
+        # 取负数（熵越低 → 值越大）
+        neg_entropy = -entropy  # [B, N]
+        neg_entropy_all.append(neg_entropy)
+
+    return neg_entropy_all
+
+
+
 class DINOLoss(nn.Module):
     def __init__(self, out_dim, ncrops, warmup_teacher_temp, teacher_temp,
                  warmup_teacher_temp_epochs, nepochs, student_temp=0.1,
@@ -1015,7 +1038,61 @@ class DDINOLoss(nn.Module):
 
         ############################################
 
-        
+        ############################################
+
+        entropy = get_entropy(t_region, B, N)
+        entropy_t = torch.stack([e for e in entropy], dim=0)  # [V,B,N]
+        entropy_norm = F.softmax(entropy_t, dim=-1)  # [V,B,N]
+
+        topk_entropy_norm_0 = torch.gather(entropy_norm[0], 1, topk_indices[0])
+        topk_entropy_norm_1 = torch.gather(entropy_norm[1], 1, topk_indices[1])
+
+        attn_weight_0 = patch_attentions[0]  # shape: [B, K]
+        attn_weight_1 = patch_attentions[1]  # shape: [B, K]
+
+        if epoch < warmup_epoch:
+            beta = 0.0
+        else:
+            beta = min(max_beta, max_beta * (epoch - warmup_epoch) / (300 - warmup_epoch))
+
+        attn_weight_0 = attn_weight_0 * (1 + beta * topk_entropy_norm_0)
+        attn_weight_1 = attn_weight_1 * (1 + beta * topk_entropy_norm_1)
+
+        # attn_weight_0 = 1* (1 + beta * topk_entropy_norm_0)
+        # attn_weight_1 = 1* (1 + beta * topk_entropy_norm_1)
+
+        # 做归一化（可选，避免数值不稳定）
+        attn_weight_0 = attn_weight_0 / (attn_weight_0.sum(dim=1, keepdim=True) + 1e-6)
+        attn_weight_1 = attn_weight_1 / (attn_weight_1.sum(dim=1, keepdim=True) + 1e-6)
+
+
+
+        patch_pool_0 = torch.sum(patch_features[0] * attn_weight_0.unsqueeze(-1), dim=1)  # [B, C]
+        patch_pool_1 = torch.sum(patch_features[1] * attn_weight_1.unsqueeze(-1), dim=1)
+
+        logits_0 = self.head(patch_pool_0)  # (B, D)
+        logits_1 = self.head(patch_pool_1)
+
+        pseudo_cls_0 = F.softmax((logits_0 - self.center_patch) / temp, dim=-1)
+        pseudo_cls_1 = F.softmax((logits_1 - self.center_patch) / temp, dim=-1)
+
+        patch_output = torch.cat([logits_0, logits_1], dim=0)
+
+        logprob_s_cls_0 = F.log_softmax(s_cls[0], dim=-1)
+        logprob_s_cls_1 = F.log_softmax(s_cls[1], dim=-1)
+
+        # —— 伪类对学生的监督 ——
+        loss_pseudo_00 = torch.sum(-pseudo_cls_0 * logprob_s_cls_0, dim=-1).mean()
+        loss_pseudo_11 = torch.sum(-pseudo_cls_1 * logprob_s_cls_1, dim=-1).mean()
+
+        # 跨视图伪类对学生的监督
+        loss_cross_01 = torch.sum(-pseudo_cls_0 * logprob_s_cls_1, dim=-1).mean()
+        loss_cross_10 = torch.sum(-pseudo_cls_1 * logprob_s_cls_0, dim=-1).mean()
+
+        # 总融合
+        loss_pseudo_view = 0.25 * (loss_pseudo_00 + loss_pseudo_11 + loss_cross_01 + loss_cross_10)
+        # loss_pseudo_view = 0.5 * (loss_pseudo_00 + loss_pseudo_11 )
+
         total_loss = 0
         n_loss_terms = 0
 

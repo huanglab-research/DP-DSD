@@ -1,7 +1,13 @@
 # Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition
 
 This is the  implementation of  paper: Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition
-> ⚠ **Note:** The source code is currently incomplete and will be fully released once the manuscript is accepted by the journal.
+By Ting Yang, Lei Huang, Jie Nie and Zhiqiang Wei. 
+> **Abstract:** 
+Self-supervised learning has achieved remarkable performance in generic representation learning. However, most existing approaches often struggle in fine-grained visual recognition, as they tend to focus on globally dominant patterns while neglecting subtle but discriminative patterns that are essential for distinguishing visually similar categories. 
+> To address this limitation, this paper proposes Dual-Path Discriminative Semantic Distillation (DP-DSD), a novel fine-grained self-supervised framework that prioritizes a local distillation pathway to explicitly discover and transfer category-specific knowledge, while a global pathway preserves holistic semantic consistency, jointly producing representations with enhanced fine-grained separability and global coherence. Specifically, the local pathway is structured around two synergistic modules. 
+> A Local Semantic Prototype Generation module is designed to characterize discriminative information via two complementary signals, with attention indicating saliency and entropy reflecting distinctiveness, which together consolidate stable semantic prototypes. Building upon these prototypes, we propose a Local Semantic Distillation module to transfer discriminative signals through intra- and cross-view. 
+> In parallel, the global pathway aligns global distributions to preserve holistic semantic coherence. Extensive experiments on three widely used fine-grained benchmarks demonstrate the effectiveness of the proposed framework and its superiority over several state-of-the-art methods across different evaluation settings.
+<img width="800" src="model.png">
 
 ## Datasets
 Experiments on **three image datasets**:
@@ -38,8 +44,13 @@ CUDA_VISIBLE_DEVICES=0 torchrun --nproc_per_node=1 --master_port=29601 eval_line
 
 We are very grateful for these excellent works: [EsViT](https://github.com/microsoft/esvit),[DINO]( https://github.com/facebookresearch/dino). Please follow their respective licenses for usage and redistribution. Thanks for their awesome works.
 
-## Contact
+## Cite
 
-Feel free to contact me if there is any question. (Ting Yang: [yangting123@stu.ouc.edu.cn](mailto:yangting123@stu.ouc.edu.cn), Lei Huang: [huangl@ouc.edu.cn](mailto:huangl@ouc.edu.cn))
-
----
+```
+@ARTICLE{xu2026,
+  author={Ting Yang, Lei Huang, Jie Nie, Yadong Huo and Zhiqiang Wei},
+  journal={IEEE Transactions on Circuits and Systems for Video Technology}, 
+  title={Dual-Path Discriminative Semantic Distillation for Self-Supervised Fine-Grained Visual Recognition}, 
+  year={2026}
+}
+```
